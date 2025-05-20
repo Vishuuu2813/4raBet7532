@@ -122,3 +122,8 @@ app.get('/api/user', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+app.get("/", (req, res) => {
+  res.json({
+    status: true
+  })
+})
