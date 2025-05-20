@@ -1,10 +1,7 @@
-// index.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-// Import User Model
-const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +15,23 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(express.json());
 
+// Define User Schema inline (this is a workaround for the issue)
+const userSchema = new mongoose.Schema({
+  email: { type: String },
+  phone: { type: String },
+  password: { type: String, required: true },
+  loginMethod: { type: String, enum: ['email', 'phone'], required: true },
+  loginDate: { type: String },
+  loginTime: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  loginHistory: [{
+    date: { type: String },
+    time: { type: String },
+    method: { type: String },
+    device: { type: String, default: 'Web Browser' }
+  }]
+});
+
 // MongoDB Connection
 mongoose.connect('mongodb+srv://vishu:NdO3hK4ShLCi4YKD@cluster0.4iukcq5.mongodb.net/New4raBet', {
 }).then(() => {
@@ -25,6 +39,9 @@ mongoose.connect('mongodb+srv://vishu:NdO3hK4ShLCi4YKD@cluster0.4iukcq5.mongodb.
 }).catch(err => {
   console.error('MongoDB connection error:', err);
 });
+
+// Define model after connection is established
+const User = mongoose.model('User', userSchema);
 
 // Routes
 app.post('/api/login', async (req, res) => {
