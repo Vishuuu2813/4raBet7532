@@ -1,7 +1,10 @@
+// index.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+// Import User Model
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,31 +20,11 @@ app.use(express.json());
 
 // MongoDB Connection
 mongoose.connect('mongodb+srv://vishu:NdO3hK4ShLCi4YKD@cluster0.4iukcq5.mongodb.net/New4raBet', {
-
 }).then(() => {
   console.log('Connected to MongoDB');
 }).catch(err => {
   console.error('MongoDB connection error:', err);
 });
-
-// User Schema
-const userSchema = new mongoose.Schema({
-  email: { type: String },
-  phone: { type: String },
-  password: { type: String, required: true },
-  loginMethod: { type: String, enum: ['email', 'phone'], required: true },
-  loginDate: { type: String },
-  loginTime: { type: String },
-  createdAt: { type: Date, default: Date.now },
-  loginHistory: [{
-    date: { type: String },
-    time: { type: String },
-    method: { type: String },
-    device: { type: String, default: 'Web Browser' }
-  }]
-});
-
-const User = mongoose.model('User', userSchema);
 
 // Routes
 app.post('/api/login', async (req, res) => {
@@ -118,12 +101,19 @@ app.get('/api/user', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Health check endpoint
 app.get("/", (req, res) => {
   res.json({
     status: true
   })
 })
+
+// For Vercel serverless deployment
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export for Vercel serverless functions
+module.exports = app;
