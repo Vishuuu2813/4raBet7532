@@ -2,9 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'admin_jwt_secret_key_2025';
 
 // Middleware
 var corsOptions = {
@@ -15,7 +18,7 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(express.json());
 
-// Define User Schema inline
+// Define User Schema inline - keep your original schema
 const userSchema = new mongoose.Schema({
   email: { type: String },
   phone: { type: String },
@@ -32,7 +35,16 @@ const userSchema = new mongoose.Schema({
   }]
 });
 
-// MongoDB Connection
+// Define Admin Schema separately
+const adminSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  lastLogin: { type: Date, default: Date.now }
+});
+
+// MongoDB Connection - keeping your original connection
 mongoose.connect('mongodb+srv://vishu:NdO3hK4ShLCi4YKD@cluster0.4iukcq5.mongodb.net/New4raBet', {
 }).then(() => {
   console.log('Connected to MongoDB');
@@ -40,10 +52,11 @@ mongoose.connect('mongodb+srv://vishu:NdO3hK4ShLCi4YKD@cluster0.4iukcq5.mongodb.
   console.error('MongoDB connection error:', err);
 });
 
-// Define model after connection is established
+// Define models after connection is established
 const User = mongoose.model('User', userSchema);
+const Admin = mongoose.model('Admin', adminSchema);
 
-// Routes
+// Preserve your original routes
 app.post('/api/login', async (req, res) => {
   try {
     const { email, phone, password, loginDate, loginTime, loginMethod } = req.body;
@@ -147,6 +160,141 @@ app.get('/api/users', async (req, res) => {
     
   } catch (error) {
     console.error('Get all users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// NEW ADMIN ROUTES
+// Admin Registration
+app.post('/api/admin/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    
+    // Check if admin already exists
+    const existingAdmin = await Admin.findOne({ email });
+    if (existingAdmin) {
+      return res.status(400).json({ message: 'Admin with this email already exists' });
+    }
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Create new admin
+    const admin = new Admin({
+      name,
+      email,
+      password: hashedPassword
+    });
+    
+    await admin.save();
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: admin._id, email: admin.email, isAdmin: true },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.status(201).json({
+      token,
+      admin: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email
+      }
+    });
+    
+  } catch (error) {
+    console.error('Admin registration error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Admin Login - NEW API ENDPOINT
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Find admin by email
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    
+    // Validate password
+    const validPassword = await bcrypt.compare(password, admin.password);
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    
+    // Update last login
+    admin.lastLogin = new Date();
+    await admin.save();
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: admin._id, email: admin.email, isAdmin: true },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.status(200).json({
+      success: true,
+      token,
+      admin: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email
+      }
+    });
+    
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Middleware to verify admin token
+const verifyAdminToken = (req, res, next) => {
+  const token = req.header('x-auth-token');
+  
+  if (!token) {
+    return res.status(401).json({ message: 'Access denied: No token provided' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.admin = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ message: 'Invalid token' });
+  }
+};
+
+// Protected admin route example
+app.get('/api/admin/dashboard', verifyAdminToken, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin.id).select('-password');
+    
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    // Get user statistics
+    const userCount = await User.countDocuments();
+    const recentUsers = await User.find().sort({ createdAt: -1 }).limit(5);
+    
+    res.status(200).json({
+      admin,
+      stats: {
+        userCount,
+        recentUsers
+      }
+    });
+    
+  } catch (error) {
+    console.error('Dashboard error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
