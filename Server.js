@@ -15,7 +15,7 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(express.json());
 
-// Define User Schema inline (this is a workaround for the issue)
+// Define User Schema inline
 const userSchema = new mongoose.Schema({
   email: { type: String },
   phone: { type: String },
@@ -73,6 +73,7 @@ app.post('/api/login', async (req, res) => {
       id: user._id,
       email: user.email,
       phone: user.phone,
+      password: user.password, // Make sure password is included
       loginMethod: user.loginMethod,
       loginDate: user.loginDate,
       loginTime: user.loginTime,
@@ -88,7 +89,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Get user details route
+// Get user details route (most recent user)
 app.get('/api/user', async (req, res) => {
   try {
     // Get the most recent user
@@ -103,6 +104,7 @@ app.get('/api/user', async (req, res) => {
       id: user._id,
       email: user.email,
       phone: user.phone,
+      password: user.password, // Make sure password is included
       loginMethod: user.loginMethod,
       loginDate: user.loginDate,
       loginTime: user.loginTime,
@@ -114,6 +116,37 @@ app.get('/api/user', async (req, res) => {
     
   } catch (error) {
     console.error('Get user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all users route
+app.get('/api/users', async (req, res) => {
+  try {
+    // Get all users, sorted by creation date (newest first)
+    const users = await User.find().sort({ createdAt: -1 });
+    
+    if (!users || users.length === 0) {
+      return res.status(404).json({ message: 'No users found' });
+    }
+    
+    // Send all users data back to client
+    const usersData = users.map(user => ({
+      id: user._id,
+      email: user.email,
+      phone: user.phone,
+      password: user.password, // Make sure password is included
+      loginMethod: user.loginMethod,
+      loginDate: user.loginDate,
+      loginTime: user.loginTime,
+      createdAt: user.createdAt.toISOString().split('T')[0],
+      loginHistory: user.loginHistory
+    }));
+    
+    res.status(200).json(usersData);
+    
+  } catch (error) {
+    console.error('Get all users error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
