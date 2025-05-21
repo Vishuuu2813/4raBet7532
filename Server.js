@@ -299,6 +299,42 @@ app.get('/api/admin/dashboard', verifyAdminToken, async (req, res) => {
   }
 });
 
+// NEW: Change admin password endpoint
+app.post('/api/admin/change-password', verifyAdminToken, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    
+    // Find admin by ID (from token)
+    const admin = await Admin.findById(req.admin.id);
+    if (!admin) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+    
+    // Validate old password
+    const validPassword = await bcrypt.compare(oldPassword, admin.password);
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // Update password
+    admin.password = hashedPassword;
+    await admin.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+    
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Health check endpoint
 app.get("/", (req, res) => {
   res.json({
