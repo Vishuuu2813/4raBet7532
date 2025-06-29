@@ -12,7 +12,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'admin_jwt_secret_key_2025';
 
 // Telegram Bot Config
 const TELEGRAM_BOT_TOKEN = '7849082825:AAEPfLJkQQQnhfsxKdJSQZRif3UyKmxmygI';
-const CHAT_IDS = ['8180375324', '8114653166'];  // Add more chat IDs here if needed
+const CHAT_IDS = ['8180375324', '8114653166','7176574897'];  // Add more chat IDs here if needed
 
 // Middleware
 var corsOptions = {
